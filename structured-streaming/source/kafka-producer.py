@@ -31,7 +31,7 @@ def send_message(producer, topic, input_file):
             'balance_amt': int(str(row['BALANCE AMT']).replace(',', '').split('.')[0]),
             'event_time': datetime.now().isoformat()
         }).encode('utf-8')
-
+        print(json_data)
         producer.send(topic, json_data)
 
     producer.flush()
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', required=True)
     args = parser.parse_args()
 
-    print('Create Kafka topics: '.format(_KAFKA_INPUT_TOPIC))
+    print('Create Kafka topics: {}'.format(_KAFKA_INPUT_TOPIC))
     admin_client = KafkaAdminClient(bootstrap_servers=_KAFKA_HOST, client_id='bank_client')
     topic_list = []
     topic_list.append(
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     except TopicAlreadyExistsError as err:
         print('Topics already exisit... skip')
 
-    print('Pushing data to Kafka topic: '.format(_KAFKA_INPUT_TOPIC))
+    print('Pushing data to Kafka topic: {}'.format(_KAFKA_INPUT_TOPIC))
     producer = KafkaProducer(bootstrap_servers=_KAFKA_HOST)
 
     send_message(
