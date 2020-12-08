@@ -7,7 +7,8 @@ pip install -r docs/requirements.txt
 ```
 
 ## 環境
-
+- Java 1.8.0_271
+- pyspark 2.4.5
 - kafka
 - kafdrop
 
