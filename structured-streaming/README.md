@@ -8,6 +8,7 @@ pip install -r docs/requirements.txt
 
 ## 環境
 - Java 1.8.0_271
+- Spark Jar: delta-core_2.11:0.6.1, hadoop-aws:2.7.3
 - pyspark 2.4.5
 - kafka
 - kafdrop
