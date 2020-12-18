@@ -12,9 +12,9 @@ aws_section = 'default'
 _AWS_KEY_ID = config.get(aws_section, "aws_access_key_id")
 _AWS_SECRET_KEY = config.get(aws_section, "aws_secret_access_key")
 _KAFKA_HOST = '127.0.0.1:9092'
-_KAFKA_INPUT_TOPIC = 'bank-transaction'
+_KAFKA_INPUT_TOPIC = 'delta_products'
 _KAFKA_GROUP_ID = 'sp-count'
-_S3_BUCKET = 's3a://odc-raw-data-ut-bucket/Arthur/delta_lake/'
+_S3_BUCKET = 's3a://odc-raw-data-ut-bucket/Arthur/delta_lake/products'
 
 
 def get_spark_session():
@@ -48,16 +48,24 @@ def get_spark_session():
 def set_schema():
     schema = (
         StructType()
-        .add('account_no', StringType())
-        .add('date', StringType())
-        .add('transaction_details', StringType())
-        .add('value_date', StringType())
-        .add('withdrawal_amt', IntegerType())
-        .add('balance_amt', IntegerType())
-        .add('event_time', TimestampType())
+        .add('ProductID', StringType())
+        .add('Date', StringType())
+        .add('Price', StringType())
+        .add('Quantity', StringType())
     )
 
     return schema
+
+
+def upsert_to_delta(df, batch_id):
+    (
+        DeltaTable.forPath(sc, _S3_BUCKET)
+        .alias("products")
+        .merge(df.alias("products_new"), "products.ProductID = products_new.ProductID")
+        .whenMatchedUpdateAll()
+        .whenNotMatchedInsertAll()
+        .execute()
+    )
 
 
 if __name__ == '__main__':
@@ -78,7 +86,6 @@ if __name__ == '__main__':
         .option('subscribe', _KAFKA_INPUT_TOPIC)
         .load()
     )
-
     df = (
         df_json.selectExpr('CAST(key AS STRING)', 'CAST(value AS STRING)')
         .select(from_json(col('value'), schema).alias('transaction_data'))
@@ -88,10 +95,12 @@ if __name__ == '__main__':
     # Write delta table to S3
     qry = (
         df.writeStream.format('delta')
-        .outputMode('append')
+        .foreachBatch(upsert_to_delta)
+        .outputMode("update")
+        .option("mergeSchema", "true")
         .option('kafka.bootstrap.servers', _KAFKA_HOST)
         .option('checkpointLocation', './tmp/checkpoint-{}'.format(_KAFKA_GROUP_ID))
-        .start('{}/{}'.format(_S3_BUCKET, _KAFKA_INPUT_TOPIC))
+        .start(_S3_BUCKET)
     )
 
     qry.awaitTermination()
